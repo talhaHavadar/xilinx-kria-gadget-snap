@@ -1,0 +1,51 @@
+volumes:
+  kria:
+    schema: mbr
+    bootloader: u-boot
+    structure:
+      - name: ubuntu-seed
+        role: system-seed
+        filesystem: vfat
+        filesystem-label: ubuntu-seed
+        type: 0C
+        size: 1200M
+        content:
+          - source: $kernel:dtbs/dtbs/xilinx/
+            target: /
+          - source: $kernel:img/image.fit
+            target: /
+          - source: boot.scr
+            target: /
+      - name: ubuntu-boot
+        role: system-boot
+        filesystem: vfat
+        filesystem-label: ubuntu-boot
+        type: 0C
+        # whats the appropriate size?
+        size: 1024M
+        content:
+          - source: boot.sel
+            target: uboot/ubuntu/boot.sel
+      # NOTE: ubuntu-save is optional for unencrypted devices like the pi, so
+      # this structure can be dropped in favor of a different partition for
+      # users who wish to instead use a different partition, since with MBR we
+      # are limited to only 4 primary partitions.
+      # TODO: look into switching over to GPT, the pi bootloader firmware now
+      #       has support for this
+      - name: ubuntu-save
+        role: system-save
+        filesystem: ext4
+        type: 83
+        size: 32M
+      - name: ubuntu-data
+        role: system-data
+        filesystem: ext4
+        type: 83
+        # XXX: make auto-grow to partition
+        size: 1500M
+
+defaults:
+  system:
+    watchdog:
+      runtime-timeout: 16s
+      shutdown-timeout: 1m

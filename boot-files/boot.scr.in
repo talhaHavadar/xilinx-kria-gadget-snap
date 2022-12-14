@@ -1,0 +1,79 @@
+# The ubuntu-seed partition
+setenv seedpart 1
+# The ubuntu-boot partition
+setenv bootpart 2
+
+setenv kernel_name image.fit
+setenv kernel_addr_r 0x10000000
+
+echo "Loading ubuntu-seed configuration..."
+load ${devtype} ${devnum}:${seedpart} ${scriptaddr} uboot/ubuntu/boot.sel
+env import ${scriptaddr}
+
+
+# Legacy KV260 U-Boot was not eliminating a space at the end of the card1_name variable
+# e.g. card1_name is "SCK-KV-G ", not "SCK-KV-G"
+# Force drop of the extra space character by setenv for backward compatibility
+setenv card1_name $card1_name
+# Check for KR/KV260 board and choose the proper device tree
+if test "${card1_name}" = "SCK-KV-G" || test "${card1_name}" = "SCK-KR-G"; then
+    setenv kria 1
+    echo "Selecting DT for Kria boards"
+    if test "${card1_name}" = "SCK-KV-G"; then
+        if test "${card1_rev}" = "Z" || test "${card1_rev}" = "A"; then
+            # revA dtb also supports revZ boards
+            boot_conf=#conf-smk-k26-revA-sck-kv-g-revA
+        elif test "${card1_rev}" = "B" || test "${card1_rev}" = "1"; then
+            # revB dtb also supports rev1 boards
+            boot_conf=#conf-smk-k26-revA-sck-kv-g-revB
+        fi
+    elif test "${card1_name}" = "SCK-KR-G"; then
+        if test "${card1_rev}" = "B" || test "${card1_rev}" = "1"; then
+            # revB dtb also supports rev1 dtb
+            boot_conf=#conf-smk-k26-revA-sck-kr-g-revB
+        elif test "${card1_rev}" = "A"; then
+            boot_conf=#conf-smk-k26-revA-sck-kr-g-revA
+        fi
+    else
+        # fallback dtb
+        boot_conf=#conf-zynqmp-smk-k26-revA
+        echo "The detected Kria board is not in the supported list"
+    fi
+    echo "Kria DT: ${boot_conf}"
+fi
+
+echo "Snapd boot mode: ${snapd_recovery_mode}"
+
+if test "${snapd_recovery_mode}" = "run"
+then
+    echo "Loading ubuntu-boot configuration..."
+    load ${devtype} ${devnum}:${bootpart} ${scriptaddr} uboot/ubuntu/boot.sel
+    env import ${scriptaddr}
+    setenv kernel_bootpart "${bootpart}"
+    if test "${kernel_status}" = "try"
+    then
+        echo "Trying to boot with ${snap_kernel}"
+        setenv prefix "uboot/ubuntu/${snap_try_kernel}/"
+    else
+        echo "Using ${snap_kernel}"
+        setenv prefix "uboot/ubuntu/${snap_kernel}/"
+    fi
+else
+    # Prefix within the seed partition to the boot files
+    setenv prefix ""
+    setenv kernel_bootpart "${seedpart}"
+fi
+
+setenv console "console=ttyPS1,115200"
+setenv bootargs "${bootargs} ${console} fixrtc earlycon rw snapd_recovery_mode=${snapd_recovery_mode} snapd_recovery_system=${snapd_recovery_system} cma=1000M"
+
+if test "${card1_name}" = "SCK-KR-G" || test "${card1_name}" = "SCK-KV-G"; then
+    setenv bootargs "${bootargs} console=tty1 clk_ignore_unused uio_pdrv_genirq.of_id=generic-uio xilinx_tsn_ep.st_pcp=4"
+else
+    setenv bootargs "${bootargs} console=tty1 uio_pdrv_genirq.of_id=generic-uio"
+fi
+
+echo "Loading ${prefix}${kernel_name}..."
+load ${devtype} ${devnum}:${kernel_bootpart} ${kernel_addr_r} "${prefix}${kernel_name}"
+
+bootm ${kernel_addr_r}${boot_conf} ${kernel_addr_r}${boot_conf} ${kernel_addr_r}${boot_conf}
