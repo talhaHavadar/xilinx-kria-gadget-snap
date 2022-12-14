@@ -1,0 +1,33 @@
+name: kria-kv260
+version: 22-1
+summary: Kria KV260 gadget
+description: |
+  Support files for booting Xilinx Kria KV260.
+type: gadget
+base: core22
+assumes: [kernel-assets]
+architectures:
+  - build-on: [amd64, arm64]
+    build-for: arm64
+
+compression: lzo
+confinement: strict
+grade: stable
+
+parts:
+  # File required by Ubuntu Core
+  boot-sel:
+    plugin: nil
+    build-packages:
+      - u-boot-tools
+    override-build: |
+      mkenvimage -r -s 4096 -o ${CRAFT_PART_INSTALL}/boot.sel - < /dev/null
+
+  boot-scr:
+    plugin: nil
+    source: boot-files
+    override-build: |
+      mkimage -A arm64 -T script -C none -n 'Boot Script' -d boot.scr.in ${CRAFT_PART_INSTALL}/boot.scr
+    build-packages:
+      - sed
+      - u-boot-tools
