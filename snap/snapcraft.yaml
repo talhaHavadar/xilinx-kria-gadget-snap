@@ -27,6 +27,7 @@ parts:
     plugin: nil
     source: boot-files
     override-build: |
+      touch ${CRAFT_PART_INSTALL}/uboot.conf
       mkimage -A arm64 -T script -C none -n 'Boot Script' -d boot.scr.in ${CRAFT_PART_INSTALL}/boot.scr
     build-packages:
       - sed
